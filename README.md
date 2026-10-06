@@ -15,6 +15,7 @@ Every secret and address lives in 1Password (vault `Homelab`). The `.env.tpl` fi
 | `monitoring/` | Prometheus, Grafana, node-exporter, cAdvisor | `/srv/appdata/monitoring` |
 | `komodo/` | Komodo Core + Periphery + FerretDB (UI on :9120) | `/srv/appdata/komodo` |
 | `backup/` | restic script + systemd timer | |
+| `system/` | systemd mount unit and udev rule for the media disk | |
 | `scripts/` | `bootstrap.sh`, `render-env.sh` | |
 
 ## Where things live
@@ -25,6 +26,18 @@ Every secret and address lives in 1Password (vault `Homelab`). The `.env.tpl` fi
 | `/data/media/...` | media and downloads on the big disk; Immich library and db under `/data/media/immich` |
 | `/opt/homelab` | this repo |
 | `/etc/homelab` | host secrets: `op-token`, `backup.env` |
+
+## Media disk
+
+`/data/media` is an ext4 disk identified by its UUID. `scripts/bootstrap.sh <uuid>` installs two files from `system/`:
+
+| File | Purpose |
+|---|---|
+| `/etc/systemd/system/data-media.mount` | mounts the disk at `/data/media`; enabled for boot, and bound to the device so the mount follows the disk |
+| `/etc/udev/rules.d/99-media-auto-mount.rules` | starts the mount unit when the disk is attached, so a re-plugged disk mounts by itself |
+
+Check it with `findmnt /data/media`. The mount is a systemd unit, so `/etc/fstab` stays untouched.
+The stacks bind-mount `/data/media`, so confirm the mount is present before a deploy that follows a disk change.
 
 ## Secrets
 
@@ -72,14 +85,14 @@ Provided by you:
 | Item | Where it goes |
 |---|---|
 | 1Password service account token | `/etc/homelab/op-token` |
-| media disk mount | `/data/media` in `/etc/fstab` |
+| UUID of the media disk | find it with `lsblk -f`; pass it as `sudo scripts/bootstrap.sh <uuid>` |
 
 Docker pulls the container images (Komodo, Plex, and the rest).
 
 ## Rebuild from zero
 
 1. Install Debian, create a user, add SSH keys.
-2. `git clone <this repo> /opt/homelab && cd /opt/homelab && sudo scripts/bootstrap.sh`
+2. `git clone <this repo> /opt/homelab && cd /opt/homelab && sudo scripts/bootstrap.sh <media-disk-uuid>`
 3. Provide the items from the second table under Dependencies.
 4. Restore state: `restic restore latest --target / --include /srv/appdata`
    (Immich database: see Backups).
