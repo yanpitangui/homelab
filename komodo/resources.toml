@@ -1,0 +1,64 @@
+# Komodo Resource Sync: stack definitions (files on server, run from /opt/homelab).
+# auto_update: Komodo polls for newer images and redeploys only the changed services.
+# dns and immich poll only (badge in the UI, you click Deploy); the rest auto-update.
+
+[[stack]]
+name = "dns"
+[stack.config]
+server = "mini-pc"
+files_on_host = true
+run_directory = "/opt/homelab/dns"
+file_paths = ["compose.yaml"]
+poll_for_updates = true
+[stack.config.pre_deploy]
+path = "/opt/homelab/dns"
+command = "/opt/homelab/scripts/render-env.sh dns"
+
+[[stack]]
+name = "proxy"
+[stack.config]
+server = "mini-pc"
+files_on_host = true
+run_directory = "/opt/homelab/proxy"
+file_paths = ["compose.yaml"]
+poll_for_updates = true
+auto_update = true
+
+[[stack]]
+name = "monitoring"
+[stack.config]
+server = "mini-pc"
+project_name = "grafana"
+files_on_host = true
+run_directory = "/opt/homelab/monitoring"
+file_paths = ["compose.yaml"]
+poll_for_updates = true
+auto_update = true
+[stack.config.pre_deploy]
+path = "/opt/homelab/monitoring"
+command = "/opt/homelab/scripts/render-env.sh monitoring"
+
+[[stack]]
+name = "immich"
+[stack.config]
+server = "mini-pc"
+files_on_host = true
+run_directory = "/opt/homelab/immich"
+file_paths = ["compose.yaml"]
+poll_for_updates = true
+[stack.config.pre_deploy]
+path = "/opt/homelab/immich"
+command = "/opt/homelab/scripts/render-env.sh immich"
+
+[[stack]]
+name = "plex"
+[stack.config]
+server = "mini-pc"
+files_on_host = true
+run_directory = "/opt/homelab/plex"
+file_paths = ["compose.yaml"]
+poll_for_updates = true
+auto_update = true
+[stack.config.pre_deploy]
+path = "/opt/homelab/plex"
+command = "/opt/homelab/scripts/render-env.sh plex"

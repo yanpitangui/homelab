@@ -1,0 +1,205 @@
+name: plex
+
+services:
+  autoheal:
+    image: willfarrell/autoheal
+    container_name: autoheal
+    restart: always
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    # qbittorrent and prowlarr share this network namespace, so their ports are published here
+    ports:
+      - 8080:8080
+      - 9696:9696
+      - 6881:6881
+      - 6881:6881/udp
+    volumes:
+      - /srv/appdata/gluetun:/gluetun
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      - FIREWALL_OUTBOUND_SUBNETS=${LAN_SUBNET}
+      - FIREWALL_INPUT_PORTS=8080
+      - UPDATER_PERIOD=24h
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=${VPN_TYPE}
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - BLOCK_MALICIOUS=off
+      - PORT_FORWARD_ONLY=on
+      - PORT_FORWARDING_STATUS_FILE=/gluetun/forwarded_port
+      - VPN_PORT_FORWARDING=on
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES}
+    restart: always
+    labels:
+      - autoheal=true
+
+  port-sync:
+    image: docker:cli
+    container_name: port-sync
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    volumes:
+      - ./scripts:/scripts:ro
+      - /srv/appdata/gluetun:/gluetun
+    command: ["/bin/sh", "/scripts/port-sync.sh"]
+    restart: unless-stopped
+
+  gluetun-heal:
+    image: docker:cli
+    container_name: gluetun-heal
+    depends_on:
+      - gluetun
+    volumes:
+      - ./scripts:/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["/bin/sh", "/scripts/gluetun-heal.sh"]
+    restart: unless-stopped
+
+  plex:
+    container_name: plex
+    image: plexinc/pms-docker
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - PGID=1000
+      - PUID=1000
+      - UMASK=002
+      - TZ=${TZ}
+      - PLEX_CLAIM=${PLEX_CLAIM:-}
+      - PLEX_ADVERTISE_URL=${PLEX_ADVERTISE_URL:-}
+      - ALLOWED_NETWORKS=${ALLOWED_NETWORKS}
+    volumes:
+      - /srv/appdata/plex:/config
+      - /data/media:/data/media
+    devices:
+      - /dev/dri:/dev/dri
+
+  prowlarr:
+    container_name: prowlarr
+    image: ghcr.io/hotio/prowlarr
+    network_mode: container:gluetun
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=${TZ}
+    volumes:
+      - /srv/appdata/prowlarr:/config
+      - /data/media:/data/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+
+  sonarr:
+    container_name: sonarr
+    image: ghcr.io/hotio/sonarr
+    restart: unless-stopped
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=${TZ}
+    volumes:
+      - /srv/appdata/sonarr:/config
+      - /data/media:/data/media
+
+  radarr:
+    container_name: radarr
+    image: ghcr.io/hotio/radarr
+    restart: unless-stopped
+    ports:
+      - 7878:7878
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=${TZ}
+    volumes:
+      - /srv/appdata/radarr:/config
+      - /data/media:/data/media
+
+  qbittorrent:
+    container_name: qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:latest
+    network_mode: container:gluetun
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=${TZ}
+      - WEBUI_PORT=8080
+      - QBT_WEBUI_BIND_ADDRESS=0.0.0.0
+    volumes:
+      - /srv/appdata/qbittorrent:/config
+      - /data/media/downloads:/data/media/downloads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v2/app/version | grep -q ."]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+
+  seerr:
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:latest
+    restart: unless-stopped
+    ports:
+      - 5055:5055
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=${TZ}
+    volumes:
+      - /srv/appdata/seerr:/app/config
+
+  bazarr:
+    container_name: bazarr
+    image: ghcr.io/hotio/bazarr
+    restart: unless-stopped
+    ports:
+      - 6767:6767
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=${TZ}
+    volumes:
+      - /srv/appdata/bazarr:/config
+      - /data/media:/data/media
+
+  maintainerr:
+    container_name: maintainerr
+    image: ghcr.io/maintainerr/maintainerr:latest
+    restart: unless-stopped
+    ports:
+      - 6246:6246
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - /srv/appdata/maintainerr:/opt/data

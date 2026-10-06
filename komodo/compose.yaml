@@ -1,0 +1,69 @@
+name: komodo
+
+# Adapted from https://github.com/moghtech/komodo/blob/main/compose/ferretdb.compose.yaml
+services:
+  postgres:
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+    labels:
+      komodo.skip:
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${KOMODO_DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${KOMODO_DATABASE_PASSWORD}
+      POSTGRES_DB: postgres
+
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:2.7.0
+    labels:
+      komodo.skip:
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    volumes:
+      - ferretdb-state:/state
+    environment:
+      FERRETDB_POSTGRESQL_URL: postgres://${KOMODO_DATABASE_USERNAME}:${KOMODO_DATABASE_PASSWORD}@postgres:5432/postgres
+
+  core:
+    image: ghcr.io/moghtech/komodo-core:${COMPOSE_KOMODO_IMAGE_TAG:-2.3}
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - ferretdb
+    ports:
+      - 9120:9120
+    env_file: ./.env
+    environment:
+      KOMODO_DATABASE_ADDRESS: ferretdb:27017
+    volumes:
+      - keys:/config/keys
+      # dated DB dumps; this is what restic backs up
+      - /srv/appdata/komodo/backups:/backups
+      # resource sync files (stack definitions), read from the repo checkout
+      - /opt/homelab/komodo:/syncs/homelab:ro
+
+  periphery:
+    image: ghcr.io/moghtech/komodo-periphery:${COMPOSE_KOMODO_IMAGE_TAG:-2.3}
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - core
+    env_file: ./.env
+    volumes:
+      - keys:/config/keys
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/proc
+      # Root dir must be identical inside and outside the container
+      - /srv/appdata/komodo/periphery:/srv/appdata/komodo/periphery
+      # repo checkout; stacks run from here ("files on server"). Same path inside and outside.
+      - /opt/homelab:/opt/homelab
+      # lets pre-deploy hooks render .env files from 1Password
+      - /usr/bin/op:/usr/bin/op:ro
+      - /etc/homelab/op-token:/etc/homelab/op-token:ro
+
+volumes:
+  postgres-data:
+  ferretdb-state:
+  keys:

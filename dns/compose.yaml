@@ -1,0 +1,19 @@
+name: dns
+
+services:
+  dns-server:
+    container_name: dns-server
+    hostname: dns-server
+    image: technitium/dns-server:latest
+    restart: always
+    ports:
+      - "5380:5380/tcp"                    # web console
+      - "${SERVER_IP}:53:53/udp"
+      - "${SERVER_IP}:53:53/tcp"
+      - "${SERVER_IP}:853:853/udp"       # DNS-over-QUIC
+    environment:
+      - DNS_SERVER_DOMAIN=dns-server
+    volumes:
+      - /srv/appdata/dns:/etc/dns
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65000

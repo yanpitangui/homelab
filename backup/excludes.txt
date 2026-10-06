@@ -1,0 +1,22 @@
+*/Cache
+*/Caches
+*/Codecs
+*/Crash Reports
+*/Logs
+*/logs
+*/Media
+*/Metadata
+*/Plug-in Support/Caches
+*/Diagnostics
+*/MediaCover
+*/Backups
+*/.unmanic
+# Technitium: keep config/zones/apps; skip query stats, logs, downloaded lists, cache
+/srv/appdata/dns/stats
+/srv/appdata/dns/logs
+/srv/appdata/dns/blocklists
+/srv/appdata/dns/cache.bin
+# Komodo: back up dated dumps only; repo clones are reproducible
+/srv/appdata/komodo/periphery
+# repo checkout: rendered env files hold secrets and are re-created from 1Password
+/opt/homelab/*/.env

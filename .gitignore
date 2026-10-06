@@ -1,0 +1,5 @@
+.env
+*.env
+*.rendered
+*.tar.gz
+*.dump
