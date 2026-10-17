@@ -59,6 +59,8 @@ run_directory = "/opt/homelab/plex"
 file_paths = ["compose.yaml"]
 poll_for_updates = true
 auto_update = true
+# qbittorrent/prowlarr pin gluetun's container ID; redeploy the whole stack so they follow a recreated gluetun
+auto_update_all_services = true
 [stack.config.pre_deploy]
 path = "/opt/homelab/plex"
 command = "/opt/homelab/scripts/render-env.sh plex"
