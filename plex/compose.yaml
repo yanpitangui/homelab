@@ -61,10 +61,12 @@ services:
     container_name: gluetun-heal
     depends_on:
       - gluetun
+    # same path as on the host, so compose can recreate the dependents with this stack's file and .env
+    working_dir: /opt/homelab/plex
     volumes:
-      - ./scripts:/scripts:ro
+      - /opt/homelab/plex:/opt/homelab/plex:ro
       - /var/run/docker.sock:/var/run/docker.sock
-    command: ["/bin/sh", "/scripts/gluetun-heal.sh"]
+    command: ["/bin/sh", "scripts/gluetun-heal.sh"]
     restart: unless-stopped
 
   plex:
